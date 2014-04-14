@@ -2,11 +2,11 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 // SE: Shark's (default) energy
-#define SE 20
+#define SE 56
 // RF: reproduce fish, chronons needed to reproduce
-#define RF 5
+#define RF 100000
 // RS: reproduce shark, chronons needed to reproduce 
-#define RS 15
+#define RS 4
 // Element structure
 typedef struct {
  char type; // w: water, f: fish, s: shark
@@ -16,18 +16,18 @@ typedef struct {
 
 Adafruit_BicolorMatrix matrix = Adafruit_BicolorMatrix();
 Element board [][8] = { { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
-                        { {'w',0,0}, {'w',0,0}, {'f',0,0}, {'w',0,0}, {'w',0,0}, {'f',0,0}, {'w',0,0}, {'w',0,0} },
-                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'f',0,0}, {'s',0,SE}, {'f',0,0}, {'f',0,0} },
-                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'f',0,0} },
-                        { {'w',0,0}, {'f',0,0}, {'s',0,SE}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'f',0,0} },
-                        { {'w',0,0}, {'f',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
-                        { {'w',0,0}, {'f',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'s',0,SE}, {'w',0,0}, {'w',0,0} },
-                        { {'f',0,0}, {'f',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} }
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} },
+                        { {'f',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0}, {'w',0,0} }
                       };
 void setup() {
  matrix.begin(0x70);
  randomSeed(analogRead(0));
- //Serial.begin(9600);
+ Serial.begin(9600);
 }
 /* Paints the board  */
 void paint() {
@@ -86,22 +86,20 @@ void reproduce(uint8_t i, uint8_t j) {
 }
 /* Moves randomly the creature at (i, j) */
 boolean moveCreature(uint8_t i, uint8_t j) {
- /*
  Serial.println();
  Serial.print("Want to move creature at  row:");
  Serial.print(i);
  Serial.print(" column: ");
  Serial.print(j);
  Serial.println(")");
- */
  if(board[i][j].type != 'w') {
    int r = i, c = j;
    // Plan of moves
    // |-|1|-|
    // |2|x|3|
    // |-|4|-|
-   // Positions            1      2      3      4
-   uint8_t pos [][2] = { {0,0}, {0,0}, {0,0}, {0,0} };
+   // Positions      1      2      3      4
+   uint8_t pos = { {0,0}, {0,0}, {0,0}, {0,0} }
    pos[0][1] = c;  // for 1 column does not change
    pos[1][0] = r;  // for 2 row does not change
    pos[2][0] = r;  // for 3 row does not change
@@ -128,6 +126,7 @@ boolean moveCreature(uint8_t i, uint8_t j) {
        pos[2][1] = c + 1; 
      }
    // Behaviours
+   int choose = -1;
    // Check space and food
    boolean space = false, fish = false;
    for(uint8_t it = 0 ; it < 4 ; it++){
@@ -137,41 +136,22 @@ boolean moveCreature(uint8_t i, uint8_t j) {
        if(board[pos[it][0]][pos[it][1]].type == 'f')
          fish = true;
    }
+   boolean ret = false;
    int choose = -1;
-   // Fish's and shark's behaviour (when no food)
-   if(board[i][j].type == 'f' || (board[i][j].type == 's' && !fish)){
-     if(space) {
+   if(board[i][j].type == 'f' && space) {
+     ret = true; // we can move
+     choose = random(4);
+     while(board[pos[choose][0]][pos[choose][1]].type != 'w'){
        choose = random(4);
-       while(board[pos[choose][0]][pos[choose][1]].type != 'w'){
-         choose = random(4);
-       }
      }
-   } else {
-      // Shark's behaviour when there is food
-      choose = random(4);
-      while(board[pos[choose][0]][pos[choose][1]].type != 'f'){
-        choose = random(4); 
-      }
    }
-   // Update blank spaces and destination places
-   if(space || fish) {
-      board[pos[choose][0]][pos[choose][1]].type = board[i][j].type;
-      board[i][j].type = 'w';
-      board[pos[choose][0]][pos[choose][1]].survivedChro = board[i][j].survivedChro;
-      board[i][j].survivedChro = 0;
-      if(fish && board[pos[choose][0]][pos[choose][1]].type == 's'){
-        // The shark has eaten the fish
-        board[pos[choose][0]][pos[choose][1]].energy = board[i][j].energy + 1;
-      } else {
-       board[pos[choose][0]][pos[choose][1]].energy = board[i][j].energy; // Fish's energy = 0 
-      }
-      board[i][j].energy = 0;
-   }
-   return space || fish;
+   // TODO Shark's behaviour
+   // TODO update movements
+   return ret;
  }else return false;
 }
 void loop() {
  paint();
- delay(500);
+ delay(1000);
  nextChronon();
 }
